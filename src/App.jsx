@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, User, Cpu, RotateCcw, Target, Swords, Plus, Upload, X, Lock } from 'lucide-react';
 
 const VirtualPogGame = () => {
@@ -22,17 +22,17 @@ const VirtualPogGame = () => {
   const [confetti, setConfetti] = useState([]);
   const [showAimGuide, setShowAimGuide] = useState(true);
   const [selectionComplete, setSelectionComplete] = useState(false);
-  
-  // Custom pog creator states
   const [showCustomPogModal, setShowCustomPogModal] = useState(false);
   const [customPogs, setCustomPogs] = useState([]);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [pogName, setPogName] = useState('');
+  const [showFlipShowcase, setShowFlipShowcase] = useState(false);
+  const [showcaseEffect, setShowcaseEffect] = useState(null);
+  const [isProcessingTurn, setIsProcessingTurn] = useState(false);
 
   const MAX_FREE_CUSTOM_POGS = 5;
   const POGS_PER_GAME = 15;
 
-  // Load custom pogs from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('customPogs');
     if (saved) {
@@ -40,7 +40,6 @@ const VirtualPogGame = () => {
     }
   }, []);
 
-  // Save custom pogs to localStorage
   const saveCustomPogsToStorage = (pogs) => {
     localStorage.setItem('customPogs', JSON.stringify(pogs));
   };
@@ -60,7 +59,6 @@ const VirtualPogGame = () => {
     { bg: '#69F0AE', secondary: '#00E676', icon: '☮️', name: 'PEACE KEEPER', foil: true, rarity: 'rare', isDefault: true },
   ];
 
-  // Combine default and custom pogs
   const allPogDesigns = [...defaultPogDesigns, ...customPogs];
 
   const handleImageUpload = (e) => {
@@ -100,7 +98,6 @@ const VirtualPogGame = () => {
     setCustomPogs(updated);
     saveCustomPogsToStorage(updated);
     
-    // Reset modal
     setUploadedImage(null);
     setPogName('');
     setShowCustomPogModal(false);
@@ -155,6 +152,7 @@ const VirtualPogGame = () => {
     setComputerScore(0);
     setCurrentTurn('player');
     setGameState('playing');
+    setIsProcessingTurn(false);
     setMessage('🎯 Your turn! Aim and unleash the slammer!');
     setShowAimGuide(true);
   };
@@ -171,10 +169,11 @@ const VirtualPogGame = () => {
     setTimeout(() => setConfetti([]), 3000);
   };
 
-  const throwSlammer = () => {
-    if (isThrowning || stackedPogs.length === 0) return;
+  const throwSlammer = useCallback(() => {
+    if (isThrowning || stackedPogs.length === 0 || isProcessingTurn) return;
     
     setIsThrowning(true);
+    setIsProcessingTurn(true);
     setMessage('');
     setShowAimGuide(false);
     
@@ -202,7 +201,7 @@ const VirtualPogGame = () => {
         handleImpact(targetX, targetY);
       }
     }, 20);
-  };
+  }, [isThrowning, stackedPogs.length, isProcessingTurn, aimAngle]);
 
   const createParticles = (x, y) => {
     const newParticles = Array(30).fill(null).map((_, i) => {
@@ -293,9 +292,24 @@ const VirtualPogGame = () => {
     }, 25);
   };
 
+  const getShowcaseEffect = (count) => {
+    if (count >= 5) return { text: 'EPIC!!!', color: '#FF1744', size: '120px' };
+    if (count >= 4) return { text: 'FIRE!', color: '#FF6E40', size: '100px' };
+    if (count >= 3) return { text: 'SICK!', color: '#FFEA00', size: '90px' };
+    if (count >= 2) return { text: 'NICE!', color: '#00E5FF', size: '80px' };
+    if (count >= 1) return { text: 'HIT!', color: '#00E676', size: '70px' };
+    return { text: 'MISS!', color: '#666', size: '60px' };
+  };
+
   const completeFlip = (flipped, remaining) => {
     const faceUpPogs = flipped.filter(pog => pog.faceUp);
     
+    // Show the showcase effect
+    setShowFlipShowcase(true);
+    const effect = getShowcaseEffect(faceUpPogs.length);
+    setShowcaseEffect(effect);
+    
+    // Wait longer to showcase the flipped pogs
     setTimeout(() => {
       if (currentTurn === 'player') {
         setPlayerPogs(prev => [...prev, ...faceUpPogs]);
@@ -323,16 +337,23 @@ const VirtualPogGame = () => {
       setFlippingPogs([]);
       setSlammerPos({ x: 50, y: 20, z: 0, rotation: 0 });
       setIsThrowning(false);
+      setShowFlipShowcase(false);
+      setShowcaseEffect(null);
       
       if (remaining.length === 0) {
-        setTimeout(endGame, 1500);
+        setTimeout(() => {
+          setIsProcessingTurn(false);
+          endGame();
+        }, 1000);
       } else {
         setTimeout(() => {
-          setCurrentTurn(currentTurn === 'player' ? 'computer' : 'player');
+          // Switch turns and reset processing flag
+          setCurrentTurn(prev => prev === 'player' ? 'computer' : 'player');
           setShowAimGuide(currentTurn === 'computer');
-        }, 1000);
+          setIsProcessingTurn(false);
+        }, 1500);
       }
-    }, 500);
+    }, 2500); // Increased from 500ms to 2500ms for dramatic effect
   };
 
   const endGame = () => {
@@ -349,15 +370,26 @@ const VirtualPogGame = () => {
     }
   };
 
+  // Computer AI - fixed to only run when it's actually computer's turn
   useEffect(() => {
-    if (gameState === 'playing' && currentTurn === 'computer' && !isThrowning && stackedPogs.length > 0) {
-      setTimeout(() => {
+    if (
+      gameState === 'playing' && 
+      currentTurn === 'computer' && 
+      !isThrowning && 
+      !isProcessingTurn &&
+      stackedPogs.length > 0
+    ) {
+      const computerThrow = setTimeout(() => {
         setAimAngle(35 + Math.random() * 30);
         setPower(60 + Math.random() * 30);
-        setTimeout(throwSlammer, 600);
+        setTimeout(() => {
+          throwSlammer();
+        }, 600);
       }, 1000);
+
+      return () => clearTimeout(computerThrow);
     }
-  }, [currentTurn, gameState, isThrowning, stackedPogs.length]);
+  }, [currentTurn, gameState, isThrowning, isProcessingTurn, stackedPogs.length, throwSlammer]);
 
   const Pog3D = ({ pog, index, isStacked }) => {
     const zIndex = isStacked ? stackedPogs.length - index : 100 + index;
@@ -504,6 +536,35 @@ const VirtualPogGame = () => {
         }} />
       ))}
 
+      {/* Flip Showcase Effect */}
+      {showFlipShowcase && showcaseEffect && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 3000,
+          pointerEvents: 'none',
+          animation: 'showcase-zoom 2.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
+        }}>
+          <div style={{
+            fontSize: showcaseEffect.size,
+            fontWeight: '900',
+            color: showcaseEffect.color,
+            textShadow: `
+              0 0 20px ${showcaseEffect.color},
+              0 0 40px ${showcaseEffect.color},
+              0 0 60px ${showcaseEffect.color},
+              0 10px 30px rgba(0, 0, 0, 0.8)
+            `,
+            letterSpacing: '10px',
+            animation: 'text-glow 0.5s ease-in-out infinite alternate'
+          }}>
+            {showcaseEffect.text}
+          </div>
+        </div>
+      )}
+
       {/* Custom Pog Creator Modal */}
       {showCustomPogModal && (
         <div style={{
@@ -566,7 +627,6 @@ const VirtualPogGame = () => {
               flexDirection: 'column',
               gap: '25px'
             }}>
-              {/* Image Upload */}
               <div>
                 <label style={{
                   display: 'block',
@@ -609,7 +669,6 @@ const VirtualPogGame = () => {
                 </label>
               </div>
 
-              {/* Image Preview */}
               {uploadedImage && (
                 <div style={{
                   display: 'flex',
@@ -626,7 +685,6 @@ const VirtualPogGame = () => {
                 </div>
               )}
 
-              {/* Pog Name */}
               <div>
                 <label style={{
                   display: 'block',
@@ -656,7 +714,6 @@ const VirtualPogGame = () => {
                 />
               </div>
 
-              {/* Create Button */}
               <button
                 onClick={createCustomPog}
                 style={{
@@ -797,6 +854,7 @@ const VirtualPogGame = () => {
         </div>
       )}
 
+      {/* Rest of game states - keeping the same but referencing the selection component */}
       {gameState === 'selection' && (
         <div style={{
           maxWidth: '1400px',
@@ -831,7 +889,6 @@ const VirtualPogGame = () => {
               {selectedPogDesigns.length} / {POGS_PER_GAME} SELECTED
             </div>
 
-            {/* Custom Pog Slots Display */}
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1099,7 +1156,6 @@ const VirtualPogGame = () => {
         </div>
       )}
 
-      {/* Rest of the game states remain the same */}
       {gameState === 'versus' && (
         <div style={{
           position: 'fixed',
@@ -1392,7 +1448,7 @@ const VirtualPogGame = () => {
             ))}
           </div>
 
-          {currentTurn === 'player' && !isThrowning && stackedPogs.length > 0 && (
+          {currentTurn === 'player' && !isThrowning && !isProcessingTurn && stackedPogs.length > 0 && (
             <div style={{
               background: 'rgba(255, 255, 255, 0.06)',
               backdropFilter: 'blur(20px)',
@@ -1453,23 +1509,29 @@ const VirtualPogGame = () => {
               
               <button
                 onClick={throwSlammer}
+                disabled={isProcessingTurn}
                 style={{
                   width: '100%',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: isProcessingTurn 
+                    ? 'rgba(102, 126, 234, 0.5)'
+                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: 'white',
                   border: 'none',
                   padding: '26px',
                   fontSize: '30px',
                   fontWeight: '900',
                   borderRadius: '18px',
-                  cursor: 'pointer',
+                  cursor: isProcessingTurn ? 'not-allowed' : 'pointer',
                   boxShadow: '0 15px 40px rgba(102, 126, 234, 0.6)',
                   transition: 'all 0.3s',
                   textTransform: 'uppercase',
-                  letterSpacing: '2px'
+                  letterSpacing: '2px',
+                  opacity: isProcessingTurn ? 0.6 : 1
                 }}
                 onMouseOver={(e) => {
-                  e.target.style.transform = 'translateY(-3px) scale(1.02)';
+                  if (!isProcessingTurn) {
+                    e.target.style.transform = 'translateY(-3px) scale(1.02)';
+                  }
                 }}
                 onMouseOut={(e) => {
                   e.target.style.transform = 'translateY(0) scale(1)';
@@ -1586,6 +1648,42 @@ const VirtualPogGame = () => {
           to {
             transform: translateY(100vh) rotate(720deg);
             opacity: 0;
+          }
+        }
+
+        @keyframes showcase-zoom {
+          0% { 
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+          }
+          20% { 
+            transform: translate(-50%, -50%) scale(1.5);
+            opacity: 1;
+          }
+          80% { 
+            transform: translate(-50%, -50%) scale(1.2);
+            opacity: 1;
+          }
+          100% { 
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+          }
+        }
+
+        @keyframes text-glow {
+          from {
+            text-shadow: 
+              0 0 20px currentColor,
+              0 0 40px currentColor,
+              0 0 60px currentColor,
+              0 10px 30px rgba(0, 0, 0, 0.8);
+          }
+          to {
+            text-shadow: 
+              0 0 30px currentColor,
+              0 0 60px currentColor,
+              0 0 90px currentColor,
+              0 10px 30px rgba(0, 0, 0, 0.8);
           }
         }
       `}</style>
