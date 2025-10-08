@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, User, Cpu, RotateCcw, Target, Swords } from 'lucide-react';
+import { Trophy, User, Cpu, RotateCcw, Target, Swords, Plus, Upload, X, Lock } from 'lucide-react';
 
 const VirtualPogGame = () => {
   const [gameState, setGameState] = useState('menu');
@@ -22,23 +22,95 @@ const VirtualPogGame = () => {
   const [confetti, setConfetti] = useState([]);
   const [showAimGuide, setShowAimGuide] = useState(true);
   const [selectionComplete, setSelectionComplete] = useState(false);
+  
+  // Custom pog creator states
+  const [showCustomPogModal, setShowCustomPogModal] = useState(false);
+  const [customPogs, setCustomPogs] = useState([]);
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [pogName, setPogName] = useState('');
 
+  const MAX_FREE_CUSTOM_POGS = 5;
   const POGS_PER_GAME = 15;
 
-  const pogDesigns = [
-    { bg: '#FF1744', secondary: '#D50000', icon: '💀', name: 'SKULL CRUSHER', foil: true, rarity: 'legendary' },
-    { bg: '#00E5FF', secondary: '#00B8D4', icon: '⭐', name: 'COSMIC STAR', foil: true, rarity: 'rare' },
-    { bg: '#FF6E40', secondary: '#FF3D00', icon: '🔥', name: 'INFERNO', foil: false, rarity: 'common' },
-    { bg: '#FFEA00', secondary: '#FFD600', icon: '⚡', name: 'THUNDER BOLT', foil: true, rarity: 'legendary' },
-    { bg: '#7C4DFF', secondary: '#651FFF', icon: '🐉', name: 'DRAGON FURY', foil: true, rarity: 'legendary' },
-    { bg: '#FF9100', secondary: '#FF6D00', icon: '🐯', name: 'TIGER STRIKE', foil: false, rarity: 'rare' },
-    { bg: '#00E676', secondary: '#00C853', icon: '👽', name: 'ALIEN INVADER', foil: true, rarity: 'rare' },
-    { bg: '#FF4081', secondary: '#F50057', icon: '❤️', name: 'HEART BREAKER', foil: false, rarity: 'common' },
-    { bg: '#00BFA5', secondary: '#00897B', icon: '💎', name: 'DIAMOND KING', foil: true, rarity: 'legendary' },
-    { bg: '#FFAB00', secondary: '#FF8F00', icon: '👑', name: 'ROYAL CROWN', foil: true, rarity: 'legendary' },
-    { bg: '#536DFE', secondary: '#3D5AFE', icon: '🚀', name: 'ROCKET POWER', foil: false, rarity: 'rare' },
-    { bg: '#69F0AE', secondary: '#00E676', icon: '☮️', name: 'PEACE KEEPER', foil: true, rarity: 'rare' },
+  // Load custom pogs from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('customPogs');
+    if (saved) {
+      setCustomPogs(JSON.parse(saved));
+    }
+  }, []);
+
+  // Save custom pogs to localStorage
+  const saveCustomPogsToStorage = (pogs) => {
+    localStorage.setItem('customPogs', JSON.stringify(pogs));
+  };
+
+  const defaultPogDesigns = [
+    { bg: '#FF1744', secondary: '#D50000', icon: '💀', name: 'SKULL CRUSHER', foil: true, rarity: 'legendary', isDefault: true },
+    { bg: '#00E5FF', secondary: '#00B8D4', icon: '⭐', name: 'COSMIC STAR', foil: true, rarity: 'rare', isDefault: true },
+    { bg: '#FF6E40', secondary: '#FF3D00', icon: '🔥', name: 'INFERNO', foil: false, rarity: 'common', isDefault: true },
+    { bg: '#FFEA00', secondary: '#FFD600', icon: '⚡', name: 'THUNDER BOLT', foil: true, rarity: 'legendary', isDefault: true },
+    { bg: '#7C4DFF', secondary: '#651FFF', icon: '🐉', name: 'DRAGON FURY', foil: true, rarity: 'legendary', isDefault: true },
+    { bg: '#FF9100', secondary: '#FF6D00', icon: '🐯', name: 'TIGER STRIKE', foil: false, rarity: 'rare', isDefault: true },
+    { bg: '#00E676', secondary: '#00C853', icon: '👽', name: 'ALIEN INVADER', foil: true, rarity: 'rare', isDefault: true },
+    { bg: '#FF4081', secondary: '#F50057', icon: '❤️', name: 'HEART BREAKER', foil: false, rarity: 'common', isDefault: true },
+    { bg: '#00BFA5', secondary: '#00897B', icon: '💎', name: 'DIAMOND KING', foil: true, rarity: 'legendary', isDefault: true },
+    { bg: '#FFAB00', secondary: '#FF8F00', icon: '👑', name: 'ROYAL CROWN', foil: true, rarity: 'legendary', isDefault: true },
+    { bg: '#536DFE', secondary: '#3D5AFE', icon: '🚀', name: 'ROCKET POWER', foil: false, rarity: 'rare', isDefault: true },
+    { bg: '#69F0AE', secondary: '#00E676', icon: '☮️', name: 'PEACE KEEPER', foil: true, rarity: 'rare', isDefault: true },
   ];
+
+  // Combine default and custom pogs
+  const allPogDesigns = [...defaultPogDesigns, ...customPogs];
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setUploadedImage(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const createCustomPog = () => {
+    if (!uploadedImage || !pogName.trim()) {
+      alert('Please upload an image and enter a name!');
+      return;
+    }
+
+    if (customPogs.length >= MAX_FREE_CUSTOM_POGS) {
+      alert('You\'ve reached the free limit! Unlock more slots to continue.');
+      return;
+    }
+
+    const newPog = {
+      id: `custom-${Date.now()}`,
+      name: pogName.trim().toUpperCase(),
+      image: uploadedImage,
+      bg: '#667eea',
+      secondary: '#764ba2',
+      foil: true,
+      rarity: 'custom',
+      isCustom: true
+    };
+
+    const updated = [...customPogs, newPog];
+    setCustomPogs(updated);
+    saveCustomPogsToStorage(updated);
+    
+    // Reset modal
+    setUploadedImage(null);
+    setPogName('');
+    setShowCustomPogModal(false);
+  };
+
+  const deleteCustomPog = (pogId) => {
+    const updated = customPogs.filter(p => p.id !== pogId);
+    setCustomPogs(updated);
+    saveCustomPogsToStorage(updated);
+  };
 
   const startSelection = () => {
     setGameState('selection');
@@ -320,7 +392,9 @@ const VirtualPogGame = () => {
           width: '100%',
           height: '100%',
           borderRadius: '50%',
-          background: `linear-gradient(135deg, ${pog.design.bg} 0%, ${pog.design.secondary} 100%)`,
+          background: pog.design.isCustom 
+            ? `url(${pog.design.image}) center/cover`
+            : `linear-gradient(135deg, ${pog.design.bg} 0%, ${pog.design.secondary} 100%)`,
           border: '6px solid rgba(255, 255, 255, 0.95)',
           boxShadow: `
             0 ${isStacked ? 3 : 15}px ${isStacked ? 8 : 35}px rgba(0, 0, 0, 0.5),
@@ -349,33 +423,37 @@ const VirtualPogGame = () => {
             }} />
           )}
           
-          <div style={{
-            position: 'absolute',
-            top: '10%',
-            left: '15%',
-            width: '40%',
-            height: '40%',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.7), transparent 60%)',
-          }} />
-          
-          <div style={{
-            fontSize: '56px',
-            filter: 'drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.6))',
-            zIndex: 10,
-            position: 'relative'
-          }}>
-            {pog.design.icon}
-          </div>
-          
-          <div style={{
-            position: 'absolute',
-            width: '70%',
-            height: '70%',
-            border: '4px solid rgba(255, 255, 255, 0.5)',
-            borderRadius: '50%',
-            zIndex: 1
-          }} />
+          {!pog.design.isCustom && (
+            <>
+              <div style={{
+                position: 'absolute',
+                top: '10%',
+                left: '15%',
+                width: '40%',
+                height: '40%',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.7), transparent 60%)',
+              }} />
+              
+              <div style={{
+                fontSize: '56px',
+                filter: 'drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.6))',
+                zIndex: 10,
+                position: 'relative'
+              }}>
+                {pog.design.icon}
+              </div>
+              
+              <div style={{
+                position: 'absolute',
+                width: '70%',
+                height: '70%',
+                border: '4px solid rgba(255, 255, 255, 0.5)',
+                borderRadius: '50%',
+                zIndex: 1
+              }} />
+            </>
+          )}
         </div>
       </div>
     );
@@ -386,6 +464,7 @@ const VirtualPogGame = () => {
       case 'legendary': return '#FFD700';
       case 'rare': return '#9D4EDD';
       case 'common': return '#00B4D8';
+      case 'custom': return '#00E676';
       default: return '#FFFFFF';
     }
   };
@@ -424,6 +503,186 @@ const VirtualPogGame = () => {
           pointerEvents: 'none'
         }} />
       ))}
+
+      {/* Custom Pog Creator Modal */}
+      {showCustomPogModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(30, 30, 50, 0.95) 0%, rgba(20, 20, 40, 0.95) 100%)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '32px',
+            padding: '40px',
+            maxWidth: '600px',
+            width: '100%',
+            border: '2px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 40px 100px rgba(0, 0, 0, 0.8)',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowCustomPogModal(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'white'
+              }}
+            >
+              <X size={24} />
+            </button>
+
+            <h2 style={{
+              color: 'white',
+              fontSize: '36px',
+              fontWeight: '900',
+              marginBottom: '30px',
+              textAlign: 'center'
+            }}>
+              Create Custom Pog
+            </h2>
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '25px'
+            }}>
+              {/* Image Upload */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: 'white',
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  marginBottom: '10px'
+                }}>
+                  Upload Image
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  style={{ display: 'none' }}
+                  id="pogImageUpload"
+                />
+                <label
+                  htmlFor="pogImageUpload"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    padding: '20px',
+                    borderRadius: '12px',
+                    border: '2px dashed rgba(255, 255, 255, 0.3)',
+                    cursor: 'pointer',
+                    color: 'white',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.15)'}
+                  onMouseOut={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
+                >
+                  <Upload size={24} />
+                  {uploadedImage ? 'Change Image' : 'Click to Upload'}
+                </label>
+              </div>
+
+              {/* Image Preview */}
+              {uploadedImage && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{
+                    width: '200px',
+                    height: '200px',
+                    borderRadius: '50%',
+                    background: `url(${uploadedImage}) center/cover`,
+                    border: '6px solid rgba(255, 255, 255, 0.9)',
+                    boxShadow: '0 15px 40px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 230, 118, 0.6)'
+                  }} />
+                </div>
+              )}
+
+              {/* Pog Name */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: 'white',
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  marginBottom: '10px'
+                }}>
+                  Pog Name
+                </label>
+                <input
+                  type="text"
+                  value={pogName}
+                  onChange={(e) => setPogName(e.target.value)}
+                  placeholder="Enter pog name..."
+                  maxLength={20}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px',
+                    padding: '15px',
+                    color: 'white',
+                    fontSize: '16px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Create Button */}
+              <button
+                onClick={createCustomPog}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #00E676, #00C853)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '20px',
+                  fontSize: '20px',
+                  fontWeight: '900',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  boxShadow: '0 10px 30px rgba(0, 230, 118, 0.5)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                Create Pog
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {gameState === 'menu' && (
         <div style={{
@@ -527,6 +786,7 @@ const VirtualPogGame = () => {
               🎮 How to Play
             </h3>
             <div style={{ display: 'grid', gap: '18px', fontSize: '17px', lineHeight: '1.6' }}>
+              <div><strong>🎨 Customize:</strong> Create your own custom pogs (5 free!)</div>
               <div><strong>🎯 Select:</strong> Choose your pog collection for battle</div>
               <div><strong>🎯 Aim:</strong> Slide to target the perfect angle</div>
               <div><strong>💪 Power:</strong> Higher power = more pogs flip</div>
@@ -565,9 +825,70 @@ const VirtualPogGame = () => {
               color: 'rgba(255, 255, 255, 0.8)',
               fontSize: '24px',
               fontWeight: '600',
-              letterSpacing: '2px'
+              letterSpacing: '2px',
+              marginBottom: '20px'
             }}>
               {selectedPogDesigns.length} / {POGS_PER_GAME} SELECTED
+            </div>
+
+            {/* Custom Pog Slots Display */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '15px',
+              background: 'rgba(0, 230, 118, 0.1)',
+              padding: '15px 30px',
+              borderRadius: '50px',
+              border: '2px solid rgba(0, 230, 118, 0.3)'
+            }}>
+              <div style={{
+                color: '#00E676',
+                fontSize: '18px',
+                fontWeight: '700'
+              }}>
+                Custom Pogs: {customPogs.length} / {MAX_FREE_CUSTOM_POGS}
+              </div>
+              {customPogs.length < MAX_FREE_CUSTOM_POGS ? (
+                <button
+                  onClick={() => setShowCustomPogModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #00E676, #00C853)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '50px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <Plus size={18} />
+                  Create New
+                </button>
+              ) : (
+                <button
+                  onClick={() => alert('Upgrade to unlock more slots! (Payment integration coming soon)')}
+                  style={{
+                    background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '50px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <Lock size={18} />
+                  Unlock More
+                </button>
+              )}
             </div>
           </div>
 
@@ -594,12 +915,12 @@ const VirtualPogGame = () => {
             gap: '30px',
             marginBottom: '40px'
           }}>
-            {pogDesigns.map((design, idx) => {
+            {allPogDesigns.map((design, idx) => {
               const selectCount = selectedPogDesigns.filter(d => d === design).length;
               
               return (
                 <div
-                  key={idx}
+                  key={design.id || idx}
                   onClick={() => !selectionComplete && selectPog(design)}
                   onMouseEnter={() => setHoveredPog(idx)}
                   onMouseLeave={() => setHoveredPog(null)}
@@ -646,7 +967,7 @@ const VirtualPogGame = () => {
                       width: '40px',
                       height: '40px',
                       borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${getRarityColor(design.rarity)}, ${design.bg})`,
+                      background: `linear-gradient(135deg, ${getRarityColor(design.rarity)}, ${design.bg || '#667eea'})`,
                       border: '3px solid white',
                       display: 'flex',
                       alignItems: 'center',
@@ -660,12 +981,41 @@ const VirtualPogGame = () => {
                     </div>
                   )}
 
+                  {design.isCustom && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteCustomPog(design.id);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '15px',
+                        left: '15px',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'rgba(255, 0, 0, 0.8)',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        zIndex: 10,
+                        color: 'white'
+                      }}
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+
                   <div style={{
                     width: '140px',
                     height: '140px',
                     margin: '0 auto 20px',
                     borderRadius: '50%',
-                    background: `linear-gradient(135deg, ${design.bg}, ${design.secondary})`,
+                    background: design.isCustom 
+                      ? `url(${design.image}) center/cover`
+                      : `linear-gradient(135deg, ${design.bg}, ${design.secondary})`,
                     border: '6px solid rgba(255, 255, 255, 0.9)',
                     boxShadow: `
                       0 15px 40px rgba(0, 0, 0, 0.5),
@@ -680,22 +1030,26 @@ const VirtualPogGame = () => {
                     transform: hoveredPog === idx ? 'scale(1.1) rotate(5deg)' : 'scale(1) rotate(0deg)',
                     transition: 'transform 0.3s ease-out'
                   }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '10%',
-                      left: '15%',
-                      width: '40%',
-                      height: '40%',
-                      borderRadius: '50%',
-                      background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.7), transparent 60%)',
-                    }} />
-                    <div style={{
-                      fontSize: '70px',
-                      filter: 'drop-shadow(3px 3px 8px rgba(0, 0, 0, 0.6))',
-                      zIndex: 2
-                    }}>
-                      {design.icon}
-                    </div>
+                    {!design.isCustom && (
+                      <>
+                        <div style={{
+                          position: 'absolute',
+                          top: '10%',
+                          left: '15%',
+                          width: '40%',
+                          height: '40%',
+                          borderRadius: '50%',
+                          background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.7), transparent 60%)',
+                        }} />
+                        <div style={{
+                          fontSize: '70px',
+                          filter: 'drop-shadow(3px 3px 8px rgba(0, 0, 0, 0.6))',
+                          zIndex: 2
+                        }}>
+                          {design.icon}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
@@ -745,6 +1099,7 @@ const VirtualPogGame = () => {
         </div>
       )}
 
+      {/* Rest of the game states remain the same */}
       {gameState === 'versus' && (
         <div style={{
           position: 'fixed',
@@ -864,7 +1219,9 @@ const VirtualPogGame = () => {
                     width: '42px',
                     height: '42px',
                     borderRadius: '50%',
-                    background: `linear-gradient(135deg, ${pog.design.bg}, ${pog.design.secondary})`,
+                    background: pog.design.isCustom 
+                      ? `url(${pog.design.image}) center/cover`
+                      : `linear-gradient(135deg, ${pog.design.bg}, ${pog.design.secondary})`,
                     border: '3px solid white',
                     boxShadow: i >= playerPogs.length - 4 ? '0 0 20px rgba(67, 233, 123, 0.8)' : '0 4px 12px rgba(0, 0, 0, 0.5)',
                     display: 'flex',
@@ -872,7 +1229,7 @@ const VirtualPogGame = () => {
                     justifyContent: 'center',
                     fontSize: '20px'
                   }}>
-                    {pog.design.icon}
+                    {!pog.design.isCustom && pog.design.icon}
                   </div>
                 ))}
               </div>
@@ -913,7 +1270,9 @@ const VirtualPogGame = () => {
                     width: '42px',
                     height: '42px',
                     borderRadius: '50%',
-                    background: `linear-gradient(135deg, ${pog.design.bg}, ${pog.design.secondary})`,
+                    background: pog.design.isCustom 
+                      ? `url(${pog.design.image}) center/cover`
+                      : `linear-gradient(135deg, ${pog.design.bg}, ${pog.design.secondary})`,
                     border: '3px solid white',
                     boxShadow: i >= computerPogs.length - 4 ? '0 0 20px rgba(244, 114, 182, 0.8)' : '0 4px 12px rgba(0, 0, 0, 0.5)',
                     display: 'flex',
@@ -921,7 +1280,7 @@ const VirtualPogGame = () => {
                     justifyContent: 'center',
                     fontSize: '20px'
                   }}>
-                    {pog.design.icon}
+                    {!pog.design.isCustom && pog.design.icon}
                   </div>
                 ))}
               </div>
